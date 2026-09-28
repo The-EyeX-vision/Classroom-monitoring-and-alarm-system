@@ -647,3 +647,10 @@ Timestamp,Student_ID,Suspicion_Score
 2026-09-25 14:01:49,2,Severe Lean Away from Desk,2,0.5,False,0.0,0.0,0.0,25.0,True,flagged_incidents\student_2_severe_lean_away_from_desk.jpg
 2026-09-25 14:01:50,0,Severe Lean Away from Desk,3,0.5,False,0.0,0.0,0.0,29.5,True,flagged_incidents\student_0_severe_lean_away_from_desk.jpg
 2026-09-25 14:01:50,13,Severe Lean Away from Desk,2,0.5,False,0.0,0.0,0.0,25.1,True,flagged_incidents\student_13_severe_lean_away_from_desk.jpg
+2026-09-25 14:13:46,12,Using Phone / Material Below Desk,1,0.65,False,14.1,-35.6,0.023,1.8,True,flagged_incidents\student_12_using_phone_material_below_desk.jpg
+2026-09-25 14:18:07,12,Using Phone / Material Below Desk,1,1.0,False,14.4,-34.1,0.022,1.5,True,flagged_incidents\student_12_using_phone_material_below_desk.jpg
+2026-09-25 14:18:15,12,Using Phone / Material Below Desk,2,1.0,False,14.2,-34.6,0.025,0.8,True,flagged_incidents\student_12_using_phone_material_below_desk.jpg
+2026-09-25 14:24:11,12,Using Phone / Material Below Desk,1,1.0,False,14.4,-34.1,0.022,1.5,True,flagged_incidents\student_12_using_phone_material_below_desk.jpg
+2026-09-25 14:24:17,12,Using Phone / Material Below Desk,2,1.0,False,14.2,-34.6,0.025,0.8,True,flagged_incidents\student_12_using_phone_material_below_desk.jpg
+2026-09-25 14:34:24,12,Using Phone / Material Below Desk,1,1.0,False,14.4,-34.1,0.022,1.5,True,flagged_incidents\student_12_using_phone_material_below_desk.jpg
+2026-09-25 14:34:31,12,Using Phone / Material Below Desk,2,1.0,False,14.2,-34.6,0.025,0.8,True,flagged_incidents\student_12_using_phone_material_below_desk.jpg

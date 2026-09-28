@@ -27,7 +27,7 @@ def parse_args():
         description="Smart Exam Hall Cheating Detection System"
     )
     parser.add_argument(
-        "--source", type=str, default="test_video/sample-video.mp4",
+        "--source", type=str, default="test_video/sample-two.mp4",
         help="Input video source: file path, camera index (e.g. 0), or IP URL."
     )
     parser.add_argument(
@@ -130,18 +130,12 @@ def main():
                 hands_writing = rec.get("hands_in_writing_pos", True)
                 hands_moved = rec.get("hands_moved_away", False)
                 obj_near = rec.get("object_near_hand", False)
+                is_standing = rec.get("is_standing", False)
 
-                score, should_alert, cheat_reason = suspicion_tracker.update(
-                    student_id=student_id,
-                    head_pitch_deg=pitch,
-                    head_yaw_deg=yaw,
-                    mouth_open_ratio=mouth,
-                    torso_lean_deg=lean,
-                    hands_under_desk=hands_under,
-                    hands_in_writing_pos=hands_writing,
-                    hands_moved_away=hands_moved,
-                    object_near_hand=obj_near
-                )
+                # -- Examiner Exclusion -------------------------------------------
+                # A person who is BOTH standing AND moving across the room is the
+                # examiner/invigilator. Skip all scoring and flagging for them.
+                is_examiner = is_standing and centroid_tracker.is_mobile(student_id)
 
                 raw_bbox = rec.get("bbox")
                 if isinstance(raw_bbox, dict):
@@ -159,6 +153,21 @@ def main():
                         int((cx + 0.08) * w_full),
                         int((cy + 0.15) * h_full)
                     ]
+
+                if is_examiner:
+                    continue
+
+                score, should_alert, cheat_reason = suspicion_tracker.update(
+                    student_id=student_id,
+                    head_pitch_deg=pitch,
+                    head_yaw_deg=yaw,
+                    mouth_open_ratio=mouth,
+                    torso_lean_deg=lean,
+                    hands_under_desk=hands_under,
+                    hands_in_writing_pos=hands_writing,
+                    hands_moved_away=hands_moved,
+                    object_near_hand=obj_near
+                )
 
                 if should_alert:
                     has_incident_this_frame = True

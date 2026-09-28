@@ -7,6 +7,10 @@ RIGHT_EAR      = 8
 LEFT_SHOULDER  = 11
 RIGHT_SHOULDER = 12
 LEFT_ELBOW     = 13
+LEFT_KNEE      = 25
+RIGHT_KNEE     = 26
+LEFT_ANKLE     = 27
+RIGHT_ANKLE    = 28
 RIGHT_ELBOW    = 14
 LEFT_WRIST     = 15
 RIGHT_WRIST    = 16
@@ -111,6 +115,11 @@ def _head_yaw_deg_from_face(face_landmarks):
         return 0.0
 
     offset = (nose["x"] - face_mid_x) / (face_width / 2.0)
+    
+    if face_width < 0.05:
+        offset = 1.0 if nose["x"] > face_mid_x else -1.0
+        return offset * 80.0
+
     offset = max(-1.0, min(1.0, offset))
     return offset * 70.0
 
@@ -125,7 +134,7 @@ def _head_pitch_deg(face_landmarks, pose_landmarks):
         if face_h > 1e-4:
             forehead_to_nose = nose["y"] - forehead["y"]
             ratio = forehead_to_nose / face_h
-            pitch_deg = max(0.0, (ratio - 0.42) * 160.0)
+            pitch_deg = max(0.0, (ratio - 0.45) * 160.0)
             return pitch_deg
 
     if pose_landmarks and len(pose_landmarks) > 8:
@@ -179,6 +188,9 @@ def _classify_hand_positions(pose_landmarks):
     # 1. Hands under desk (lap region)
     left_under = (lw_vis >= 0.3 and lw["y"] > 0.62)
     right_under = (rw_vis >= 0.3 and rw["y"] > 0.62)
+    
+    left_deep = (lw_vis >= 0.3 and lw["y"] > 0.70)
+    right_deep = (rw_vis >= 0.3 and rw["y"] > 0.70)
 
     if len(pose_landmarks) >= 15:
         le = pose_landmarks[LEFT_ELBOW]
@@ -188,7 +200,8 @@ def _classify_hand_positions(pose_landmarks):
         if rw_vis >= 0.3 and re.get("visibility", 1.0) >= 0.3 and (rw["y"] - re["y"]) > 0.12:
             right_under = True
 
-    hands_under = left_under or right_under
+    both_under_or_hidden = (left_under or lw_vis < 0.3) and (right_under or rw_vis < 0.3)
+    hands_under = both_under_or_hidden or left_deep or right_deep
 
     # 2. Hands in normal writing position on top of desk
     left_writing = (lw_vis >= 0.3 and 0.38 <= lw["y"] <= 0.62 and 0.22 <= lw["x"] <= 0.78)
@@ -201,6 +214,38 @@ def _classify_hand_positions(pose_landmarks):
     hands_moved_away = left_reaching or right_reaching
 
     return hands_under, hands_writing, hands_moved_away
+
+
+def _is_standing(pose_landmarks, bbox):
+    """
+    Returns True if person is standing (examiner posture) rather than sitting (student).
+    Two checks:
+    1. Lower-body visible: knee or ankle landmarks have high visibility.
+       Seated students' legs/knees are hidden behind the desk.
+    2. Bounding box is taller than wide — a full standing body occupies
+       a much taller region than a seated upper-body crop.
+    """
+    lower_body_visible = False
+    if pose_landmarks and len(pose_landmarks) > 28:
+        knee_vis = max(
+            pose_landmarks[LEFT_KNEE].get("visibility", 0.0),
+            pose_landmarks[RIGHT_KNEE].get("visibility", 0.0)
+        )
+        ankle_vis = max(
+            pose_landmarks[LEFT_ANKLE].get("visibility", 0.0),
+            pose_landmarks[RIGHT_ANKLE].get("visibility", 0.0)
+        )
+        if knee_vis >= 0.50 or ankle_vis >= 0.40:
+            lower_body_visible = True
+
+    tall_bbox = False
+    if bbox and isinstance(bbox, dict):
+        bw = bbox.get("x_max", 0) - bbox.get("x_min", 0)
+        bh = bbox.get("y_max", 0) - bbox.get("y_min", 0)
+        if bw > 1e-4 and (bh / bw) > 1.4:
+            tall_bbox = True
+
+    return lower_body_visible and tall_bbox
 
 
 def adapt(structured_output, full_w=1280, full_h=720):
@@ -242,6 +287,8 @@ def adapt(structured_output, full_w=1280, full_h=720):
 
         hands_under, hands_writing, hands_moved_away = _classify_hand_positions(raw_pose_lm) if raw_pose_lm else (False, True, False)
 
+        standing = _is_standing(raw_pose_lm, bbox)
+
         records.append({
             "centroid": centroid,
             "head_yaw_deg": head_yaw,
@@ -252,6 +299,7 @@ def adapt(structured_output, full_w=1280, full_h=720):
             "hands_in_writing_pos": hands_writing,
             "hands_moved_away": hands_moved_away,
             "object_near_hand": has_detected_phone,
+            "is_standing": standing,
             "pose_id": pose.get("pose_id"),
             "bbox": bbox,
         })

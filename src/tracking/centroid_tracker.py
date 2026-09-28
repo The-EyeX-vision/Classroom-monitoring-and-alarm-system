@@ -7,9 +7,13 @@ class CentroidTracker:
     frame centroids to the closest tracked centroid from previous frames.
     Coordinates are normalized to [0, 1].
     Includes debouncing for brand-new candidate IDs to avoid false positives.
+
+    Also tracks cumulative centroid displacement per person to distinguish
+    mobile (walking) persons like examiners from stationary seated students.
     """
 
-    def __init__(self, max_distance=0.15, max_missed_frames=20, min_confirmation_frames=3):
+    def __init__(self, max_distance=0.15, max_missed_frames=20, min_confirmation_frames=3,
+                 mobility_window=30, mobility_threshold=0.20):
         self.next_id = 0
         self.tracked = {}          # id -> (x, y) centroid, normalized
         self.missed_frames = {}    # id -> consecutive frames not matched
@@ -20,13 +24,34 @@ class CentroidTracker:
         self.pending = {}          # pending_key -> {"centroid": (x,y), "count": int}
         self.pending_next_key = 0
 
+        # Mobility tracking
+        self.mobility_window = mobility_window          # number of recent frames to track
+        self.mobility_threshold = mobility_threshold    # cumulative normalized displacement to flag as mobile
+        self.centroid_history = {}                      # id -> deque-like list of (x, y)
+
     def _promote_pending(self, pending_key):
         new_id = self.next_id
         self.next_id += 1
         self.tracked[new_id] = self.pending[pending_key]["centroid"]
         self.missed_frames[new_id] = 0
+        self.centroid_history[new_id] = []
         del self.pending[pending_key]
         return new_id
+
+    def is_mobile(self, person_id):
+        """
+        Returns True if this person's cumulative centroid displacement over the
+        last `mobility_window` frames exceeds `mobility_threshold`.
+        Used to identify the mobile examiner walking around the room.
+        """
+        history = self.centroid_history.get(person_id, [])
+        if len(history) < 2:
+            return False
+        total_disp = sum(
+            math.sqrt((history[i][0] - history[i-1][0])**2 + (history[i][1] - history[i-1][1])**2)
+            for i in range(1, len(history))
+        )
+        return total_disp >= self.mobility_threshold
 
     def update(self, detected_centroids):
         """
@@ -51,6 +76,12 @@ class CentroidTracker:
                 self.tracked[best_id] = (dx, dy)
                 self.missed_frames[best_id] = 0
                 used_ids.add(best_id)
+
+                # Update mobility history
+                h = self.centroid_history.setdefault(best_id, [])
+                h.append((dx, dy))
+                if len(h) > self.mobility_window:
+                    h.pop(0)
             else:
                 unmatched.append(i)
 
@@ -97,5 +128,6 @@ class CentroidTracker:
                 if self.missed_frames[pid] > self.max_missed_frames:
                     del self.tracked[pid]
                     del self.missed_frames[pid]
+                    self.centroid_history.pop(pid, None)
 
         return assignments
