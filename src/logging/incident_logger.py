@@ -9,9 +9,9 @@ class IncidentLogger:
     """
     Logs flagged exam cheating incidents to CSV and manages snapshot frames.
     Features:
-    1. Category Action Counters: Tracks occurrence count per student per category.
-    2. Single Initial Snapshot: Saves snapshot frame ONCE when a student first performs a category action.
-    3. Best Frame Replacement: Overwrites the stored snapshot IF a future frame captures a higher suspicion score.
+    1. Likelihood & Probability Logging: Stores likelihood tier statements, percentage scores, and activities.
+    2. Category Action Counters: Tracks occurrence count per student per activity category.
+    3. Single Initial Snapshot & Best Frame Replacement: Saves initial snapshot frame once, overwriting IF a higher score occurs.
     """
     def __init__(self, csv_filepath="classroom_alerts.csv", output_dir="flagged_incidents", cooldown_sec=5.0):
         self.csv_filepath = csv_filepath
@@ -29,8 +29,10 @@ class IncidentLogger:
                 writer.writerow([
                     "timestamp",
                     "student_id",
+                    "likelihood_statement",
+                    "probability_percentage",
                     "category_name",
-                    "category_count",
+                    "activity_count",
                     "suspicion_score",
                     "is_best_frame_replacement",
                     "head_pitch_deg",
@@ -70,8 +72,14 @@ class IncidentLogger:
         lean = metrics.get("torso_lean_deg")
         hands_under = metrics.get("hands_under_desk", False)
 
-        # Primary category string
-        category_name = cheat_reason.split(" | ")[0] if cheat_reason else "General Suspicion"
+        prob_pct = int(round(score * 100))
+
+        # Extract activity name from likelihood statement (e.g. "[High Certainty - 88%] Using Phone..." -> "Using Phone...")
+        if "]" in cheat_reason:
+            category_name = cheat_reason.split("]", 1)[1].strip().split(" | ")[0]
+        else:
+            category_name = cheat_reason.split(" | ")[0] if cheat_reason else "General Suspicion"
+
         cat_slug = self._slugify(category_name)
 
         if student_id not in self.student_categories:
@@ -95,7 +103,6 @@ class IncidentLogger:
             prev_best = student_cats[category_name]["best_score"]
             snapshot_path = student_cats[category_name]["snapshot_path"]
 
-            # Replace snapshot frame ONLY if this frame has a higher suspicion score
             if float(score) > prev_best + 0.04:
                 student_cats[category_name]["best_score"] = float(score)
                 should_save_image = True
@@ -106,31 +113,31 @@ class IncidentLogger:
 
         cat_count = student_cats[category_name]["count"]
 
-        # Save or overwrite snapshot image frame if needed
         if should_save_image:
             annotated_frame = frame.copy()
             x1, y1, x2, y2 = pixel_bbox
 
             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
 
-            badge_text = f"FLAGGED Student #{student_id} [{category_name}] Count: {cat_count} (Score: {score:.2f})"
-            cv2.rectangle(annotated_frame, (x1, max(0, y1 - 30)), (x1 + 520, max(30, y1)), (0, 0, 255), -1)
-            cv2.putText(annotated_frame, badge_text, (x1 + 5, max(20, y1 - 8)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.50, (255, 255, 255), 2)
+            badge_text = f"FLAGGED Student #{student_id} | {cheat_reason} | Count: {cat_count}"
+            cv2.rectangle(annotated_frame, (x1, max(0, y1 - 32)), (x1 + 650, max(32, y1)), (0, 0, 255), -1)
+            cv2.putText(annotated_frame, badge_text, (x1 + 5, max(22, y1 - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 2)
 
             cv2.putText(annotated_frame, f"Time: {str_time}", (20, annotated_frame.shape[0] - 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
             cv2.imwrite(snapshot_path, annotated_frame)
             action_type = "REPLACED with higher score frame" if is_replacement else "INITIAL snapshot saved"
-            print(f"[CATEGORY LOGGED] Student #{student_id} | Category: '{category_name}' | Total Count: {cat_count} | {action_type}: {snapshot_path}")
+            print(f"[INCIDENT LOGGED] Student #{student_id} | {cheat_reason} | Activity Count: {cat_count} | {action_type}: {snapshot_path}")
 
-        # Record in CSV log
         with open(self.csv_filepath, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
                 str_time,
                 student_id,
+                cheat_reason,
+                f"{prob_pct}%",
                 category_name,
                 cat_count,
                 round(float(score), 3),

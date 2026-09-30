@@ -11,9 +11,10 @@ def draw_flag_overlay(frame, bbox, student_id, score, is_flagged, cheat_reason="
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
 
     if is_flagged:
-        label = f"ID #{student_id} | FLAGGED ({score:.2f}): {cheat_reason}"
+        label = f"ID #{student_id} | {cheat_reason}"
     else:
-        label = f"ID #{student_id} | NORMAL ({score:.2f})"
+        prob_pct = int(round(score * 100))
+        label = f"ID #{student_id} | Normal ({prob_pct}%)"
 
     label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
     lbl_w, lbl_h = label_size

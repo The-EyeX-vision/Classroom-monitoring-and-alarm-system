@@ -1,6 +1,35 @@
 import time
 
 
+def get_likelihood_label(score):
+    """
+    Maps a numerical suspicion score (0.0 - 1.0) to a domain-resonant likelihood tier.
+    """
+    if score >= 0.85:
+        return "High Certainty"
+    elif score >= 0.70:
+        return "Strong Likelihood"
+    elif score >= 0.50:
+        return "Moderate Suspicion"
+    else:
+        return "Low Probability"
+
+
+def format_likelihood_statement(score, reason_text):
+    """
+    Formats a probability statement combining likelihood classification,
+    percentage score, and detected activity text.
+    Example: '[High Certainty - 88%] Using Phone / Material Below Desk'
+    """
+    if not reason_text or reason_text == "Normal":
+        return "Normal"
+
+    prob_pct = int(round(score * 100))
+    label = get_likelihood_label(score)
+
+    return f"[{label} - {prob_pct}%] {reason_text}"
+
+
 class StudentSuspicionTracker:
     """
     Maintains debounced suspicion scores per student ID based on exam hall cheating heuristics:
@@ -52,20 +81,16 @@ class StudentSuspicionTracker:
             reasons.append("Looking Down Under Desk")
 
         # Vector 2: Leaning Away from Desk / Reaching
-        # Differentiates normal slight writing lean from suspicious leaning
         if torso_lean_deg is not None:
-            # Extreme lean completely away from desk script
             if torso_lean_deg > 22.0:
                 score += 0.50
                 reasons.append("Severe Lean Away from Desk")
-            # Moderate lean combined with moving hands away from desk (reaching) or looking at peer
             elif torso_lean_deg > 15.0 and (hands_moved_away or (head_yaw_deg is not None and abs(head_yaw_deg) > 18.0)):
                 score += 0.45
                 if hands_moved_away:
                     reasons.append("Leaning & Reaching Away from Desk")
                 else:
                     reasons.append("Leaning Sideways to Peer")
-            # Slight writing lean with hands on desk is NORMAL (Score = 0.0)
 
         # Vector 3: Turning Head / Communicating (ONLY flagged if turn lasts >= 3.0 seconds)
         if is_sustained_turn:
@@ -75,13 +100,16 @@ class StudentSuspicionTracker:
             else:
                 reasons.append("Turning Head to Neighbor")
 
-        primary_reason = " | ".join(reasons) if reasons else "Normal"
-        return min(1.0, score), primary_reason
+        raw_score = min(1.0, score)
+        raw_reason = " | ".join(reasons) if reasons else "Normal"
+        formatted_statement = format_likelihood_statement(raw_score, raw_reason)
+
+        return raw_score, formatted_statement
 
     def update(self, student_id, head_pitch_deg, head_yaw_deg, mouth_open_ratio, torso_lean_deg,
                hands_under_desk, hands_in_writing_pos, hands_moved_away, object_near_hand, current_time=None):
 
-        score, reason = self.evaluate_behavior(
+        score, reason_statement = self.evaluate_behavior(
             student_id=student_id,
             head_pitch_deg=head_pitch_deg,
             head_yaw_deg=head_yaw_deg,
@@ -101,9 +129,9 @@ class StudentSuspicionTracker:
         self.debounce_counters[student_id] = count
 
         if is_over_threshold:
-            self.last_reason[student_id] = reason
+            self.last_reason[student_id] = reason_statement
 
         should_alert = count >= self.required_frames
-        active_reason = self.last_reason.get(student_id, reason) if should_alert else reason
+        active_reason = self.last_reason.get(student_id, reason_statement) if should_alert else reason_statement
 
         return score, should_alert, active_reason
