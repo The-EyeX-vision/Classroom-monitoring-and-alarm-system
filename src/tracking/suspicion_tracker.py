@@ -41,13 +41,12 @@ class StudentSuspicionTracker:
     4. Communicating / Talking: Turning head + open mouth ratio (MAR > 0.12) sustained for >= 3.0 continuous seconds.
     """
 
-    def __init__(self, threshold=0.50, required_frames=6, min_turn_sec=4.0):
+    def __init__(self, threshold=0.50, required_frames=2, min_turn_sec=0.0):
         self.threshold = threshold
         self.required_frames = required_frames
         self.min_turn_sec = min_turn_sec
         self.debounce_counters = {}       # student_id -> consecutive frames over threshold
         self.last_reason = {}             # student_id -> cheat reason string
-        self.head_turn_start_time = {}    # student_id -> float (start timestamp of head turn)
 
     def evaluate_behavior(self, student_id, head_pitch_deg, head_yaw_deg, mouth_open_ratio, torso_lean_deg,
                           hands_under_desk, hands_in_writing_pos, hands_moved_away, object_near_hand, current_time=None):
@@ -55,21 +54,16 @@ class StudentSuspicionTracker:
         score = 0.0
         reasons = []
 
-        # 1. Head turn 3-second continuous duration check
-        is_turning = (head_yaw_deg is not None and abs(head_yaw_deg) > 22.0)
-        is_sustained_turn = False
-
+        # Vector 1: Turning Head / Communicating (Immediate - No Timing Delay)
+        is_turning = (head_yaw_deg is not None and abs(head_yaw_deg) > 18.0)
         if is_turning:
-            if student_id not in self.head_turn_start_time or self.head_turn_start_time[student_id] is None:
-                self.head_turn_start_time[student_id] = current_time
+            score += 0.55
+            if mouth_open_ratio is not None and mouth_open_ratio > 0.12:
+                reasons.append("Communicating / Talking to Peer")
+            else:
+                reasons.append("Turning Head to Neighbor")
 
-            turn_duration = current_time - self.head_turn_start_time[student_id]
-            if turn_duration >= self.min_turn_sec:
-                is_sustained_turn = True
-        else:
-            self.head_turn_start_time[student_id] = None
-
-        # Vector 1: Using Phone / Material Below Desk
+        # Vector 2: Using Phone / Material Below Desk
         if (hands_under_desk and head_pitch_deg is not None and head_pitch_deg > 14.0) or (hands_under_desk and object_near_hand):
             score += 0.65
             reasons.append("Using Phone / Material Below Desk")
@@ -80,25 +74,17 @@ class StudentSuspicionTracker:
             score += 0.40
             reasons.append("Looking Down Under Desk")
 
-        # Vector 2: Leaning Away from Desk / Reaching
+        # Vector 3: Leaning Away from Desk / Reaching
         if torso_lean_deg is not None:
             if torso_lean_deg > 22.0:
                 score += 0.50
                 reasons.append("Severe Lean Away from Desk")
-            elif torso_lean_deg > 15.0 and (hands_moved_away or (head_yaw_deg is not None and abs(head_yaw_deg) > 18.0)):
+            elif torso_lean_deg > 15.0 and (hands_moved_away or is_turning):
                 score += 0.45
                 if hands_moved_away:
                     reasons.append("Leaning & Reaching Away from Desk")
                 else:
                     reasons.append("Leaning Sideways to Peer")
-
-        # Vector 3: Turning Head / Communicating (ONLY flagged if turn lasts >= 3.0 seconds)
-        if is_sustained_turn:
-            score += 0.40
-            if mouth_open_ratio is not None and mouth_open_ratio > 0.12:
-                reasons.append("Communicating / Talking to Peer")
-            else:
-                reasons.append("Turning Head to Neighbor")
 
         raw_score = min(1.0, score)
         raw_reason = " | ".join(reasons) if reasons else "Normal"

@@ -166,7 +166,7 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
     )
 
     centroid_tracker = CentroidTracker(max_distance=0.15, max_missed_frames=20)
-    suspicion_tracker = StudentSuspicionTracker(threshold=threshold, required_frames=6)
+    suspicion_tracker = StudentSuspicionTracker(threshold=threshold, required_frames=2)
     csv_log_path = "classroom_alerts.csv"
     logger = IncidentLogger(
         csv_filepath=csv_log_path,
