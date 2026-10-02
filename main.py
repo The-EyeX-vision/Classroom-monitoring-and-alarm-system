@@ -42,7 +42,7 @@ def parse_args():
         help="Path to YOLOv8 model file."
     )
     parser.add_argument(
-        "--pose-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "pose_landmarker_lite.task"),
+        "--pose-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "pose_landmarker_heavy.task"),
         help="Path to MediaPipe Pose Landmarker task file."
     )
     parser.add_argument(

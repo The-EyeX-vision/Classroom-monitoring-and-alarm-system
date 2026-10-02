@@ -143,7 +143,7 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
     stream = VideoStream(source=video_filepath)
     pipeline = ClassroomDetectionPipeline(
         yolo_model_path=os.path.join(PROJECT_ROOT, "models", "yolov8n.pt"),
-        pose_model_path=os.path.join(PROJECT_ROOT, "models", "pose_landmarker_lite.task"),
+        pose_model_path=os.path.join(PROJECT_ROOT, "models", "pose_landmarker_heavy.task"),
         face_model_path=os.path.join(PROJECT_ROOT, "models", "face_landmarker.task")
     )
 

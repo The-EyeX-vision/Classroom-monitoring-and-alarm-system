@@ -5,7 +5,7 @@ from ultralytics import YOLO
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_YOLO_PATH = os.path.join(BASE_DIR, "models", "yolov8n.pt")
-DEFAULT_POSE_PATH = os.path.join(BASE_DIR, "models", "pose_landmarker_lite.task")
+DEFAULT_POSE_PATH = os.path.join(BASE_DIR, "models", "pose_landmarker_heavy.task")
 DEFAULT_FACE_PATH = os.path.join(BASE_DIR, "models", "face_landmarker.task")
 
 
