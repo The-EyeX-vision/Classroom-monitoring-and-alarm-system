@@ -34,7 +34,7 @@ st.markdown("""
     .main-header {
         font-size: 2.2rem;
         font-weight: 700;
-        color: #4F46E5;
+        color: white;
         margin-bottom: 0px;
     }
     .sub-header {
