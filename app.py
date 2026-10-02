@@ -53,7 +53,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Title & Subtitle
-st.markdown('<div class="main-header">👁️ EyeX - Smart Exam Monitoring System</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">👁️ EyeX</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">AI-Powered Exam Cheating Detection, Behavior Analysis & Cloud Storage Logging</div>', unsafe_allow_html=True)
 
 # Sidebar Configuration
