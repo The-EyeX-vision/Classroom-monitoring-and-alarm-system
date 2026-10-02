@@ -292,7 +292,7 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
 
             # Convert BGR to RGB for Streamlit display
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+            video_placeholder.image(frame_rgb, channels="RGB", use_column_width=True)
 
             # Render incident log table
             if os.path.exists(csv_log_path):
