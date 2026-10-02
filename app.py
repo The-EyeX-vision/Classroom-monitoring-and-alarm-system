@@ -183,6 +183,10 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
 
     try:
         while st.session_state.monitoring:
+            # Dynamically sync slider adjustments from UI
+            suspicion_tracker.threshold = threshold
+            logger.cooldown_sec = cooldown_sec
+
             ret, frame = stream.read()
             if not ret or frame is None:
                 st.info("End of video stream reached.")
