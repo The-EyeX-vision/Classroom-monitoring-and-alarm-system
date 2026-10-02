@@ -278,12 +278,16 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
 
             # Render incident log table
             if os.path.exists(csv_log_path):
-                df_log = pd.read_csv(csv_log_path)
-                if not df_log.empty:
-                    log_placeholder.dataframe(
-                        df_log[["timestamp", "student_id", "category_name", "suspicion_score"]].tail(8),
-                        use_container_width=True
-                    )
+                try:
+                    df_log = pd.read_csv(csv_log_path, on_bad_lines='skip')
+                    display_cols = [c for c in ["timestamp", "student_id", "category_name", "suspicion_score"] if c in df_log.columns]
+                    if not df_log.empty and display_cols:
+                        log_placeholder.dataframe(
+                            df_log[display_cols].tail(8),
+                            use_container_width=True
+                        )
+                except Exception:
+                    pass
 
     finally:
         stream.release()
@@ -295,10 +299,13 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
 if os.path.exists("classroom_alerts.csv"):
     st.markdown("---")
     st.subheader("📥 Export Monitoring Log Data")
-    df_download = pd.read_csv("classroom_alerts.csv")
-    st.download_button(
-        label="Download Full CSV Incident Report",
-        data=df_download.to_csv(index=False),
-        file_name="classroom_monitoring_incidents.csv",
-        mime="text/csv"
-    )
+    try:
+        df_download = pd.read_csv("classroom_alerts.csv", on_bad_lines='skip')
+        st.download_button(
+            label="Download Full CSV Incident Report",
+            data=df_download.to_csv(index=False),
+            file_name="classroom_monitoring_incidents.csv",
+            mime="text/csv"
+        )
+    except Exception as e:
+        st.warning(f"Could not read incident log: {e}")
