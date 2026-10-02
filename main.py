@@ -38,7 +38,7 @@ def parse_args():
         help="Input video source: file path, camera index (e.g. 0), or IP URL."
     )
     parser.add_argument(
-        "--yolo-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "yolov8n.pt"),
+        "--yolo-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "yolov8s.pt"),
         help="Path to YOLOv8 model file."
     )
     parser.add_argument(
@@ -91,7 +91,7 @@ def main():
         face_model_path=args.face_model
     )
 
-    centroid_tracker = CentroidTracker(max_distance=0.15, max_missed_frames=20)
+    centroid_tracker = CentroidTracker(max_distance=0.25, max_missed_frames=600)
     suspicion_tracker = StudentSuspicionTracker(threshold=0.50, required_frames=6)
     logger = IncidentLogger(
         csv_filepath=args.output_csv,

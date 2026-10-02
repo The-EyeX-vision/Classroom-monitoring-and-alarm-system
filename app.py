@@ -160,12 +160,12 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
     # Initialize Stream & Pipeline
     stream = VideoStream(source=video_filepath)
     pipeline = ClassroomDetectionPipeline(
-        yolo_model_path=os.path.join(PROJECT_ROOT, "models", "yolov8n.pt"),
+        yolo_model_path=os.path.join(PROJECT_ROOT, "models", "yolov8s.pt"),
         pose_model_path=selected_pose_model,
         face_model_path=os.path.join(PROJECT_ROOT, "models", "face_landmarker.task")
     )
 
-    centroid_tracker = CentroidTracker(max_distance=0.15, max_missed_frames=20)
+    centroid_tracker = CentroidTracker(max_distance=0.25, max_missed_frames=600)
     suspicion_tracker = StudentSuspicionTracker(threshold=threshold, required_frames=2)
     csv_log_path = "classroom_alerts.csv"
     logger = IncidentLogger(

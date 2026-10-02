@@ -4,7 +4,7 @@ import mediapipe as mp
 from ultralytics import YOLO
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DEFAULT_YOLO_PATH = os.path.join(BASE_DIR, "models", "yolov8n.pt")
+DEFAULT_YOLO_PATH = os.path.join(BASE_DIR, "models", "yolov8s.pt")
 DEFAULT_POSE_PATH = os.path.join(BASE_DIR, "models", "pose_landmarker_heavy.task")
 DEFAULT_FACE_PATH = os.path.join(BASE_DIR, "models", "face_landmarker.task")
 
@@ -19,7 +19,7 @@ class ClassroomDetectionPipeline:
                  yolo_model_path=None,
                  pose_model_path=None,
                  face_model_path=None,
-                 confidence_threshold=0.25,
+                 confidence_threshold=0.15,
                  crop_phone_conf=0.45,  # Higher threshold filters bags, calculators, desk items misclassified as phones
                  crop_padding=0.05,
                  yolo_input_width=1280,
@@ -204,7 +204,7 @@ class ClassroomDetectionPipeline:
         else:
             yolo_input = frame_bgr
 
-        results = self.yolo(yolo_input, conf=self.confidence_threshold, classes=[0, 67], verbose=False)[0]
+        results = self.yolo(yolo_input, conf=self.confidence_threshold, classes=[0, 67], imgsz=self.yolo_input_width, max_det=30, verbose=False)[0]
         yolo_h, yolo_w = yolo_input.shape[:2]
 
         structured = {
