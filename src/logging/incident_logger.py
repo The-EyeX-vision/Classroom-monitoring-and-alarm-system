@@ -3,25 +3,32 @@ import cv2
 import csv
 import re
 from datetime import datetime
+from src.db.supabase_client import SupabaseManager
 
 
 class IncidentLogger:
     """
-    Logs flagged exam cheating incidents to CSV and manages snapshot frames.
+    Logs flagged exam cheating incidents to CSV and Supabase Database/Storage bucket.
     Features:
     1. Likelihood & Probability Logging: Stores likelihood tier statements, percentage scores, and activities.
     2. Category Action Counters: Tracks occurrence count per student per activity category.
     3. Single Initial Snapshot & Best Frame Replacement: Saves initial snapshot frame once, overwriting IF a higher score occurs.
+    4. Supabase DB & Storage Bucket integration: Uploads evidence frames and writes violation logs to database.
     """
-    def __init__(self, csv_filepath="classroom_alerts.csv", output_dir="flagged_incidents", cooldown_sec=5.0):
+    def __init__(self, csv_filepath="classroom_alerts.csv", output_dir="flagged_incidents", cooldown_sec=5.0, session_id=None):
         self.csv_filepath = csv_filepath
         self.output_dir = output_dir
         self.cooldown_sec = cooldown_sec
+        self.session_id = session_id or os.getenv("EXAM_SESSION_ID")
 
         self.last_flagged_time = {}   # student_id -> float (timestamp)
         self.student_categories = {}  # student_id -> { category_name -> { "count": int, "best_score": float, "snapshot_path": str } }
 
+        # Initialize Supabase manager (handles fallback to offline CSV if env variables not set)
+        self.supabase = SupabaseManager()
+
         os.makedirs(self.output_dir, exist_ok=True)
+
 
         if not os.path.exists(self.csv_filepath):
             with open(self.csv_filepath, mode="w", newline="", encoding="utf-8") as f:
@@ -131,6 +138,25 @@ class IncidentLogger:
             action_type = "REPLACED with higher score frame" if is_replacement else "INITIAL snapshot saved"
             print(f"[INCIDENT LOGGED] Student #{student_id} | {cheat_reason} | Activity Count: {cat_count} | {action_type}: {snapshot_path}")
 
+        # Upload image snapshot to Supabase Storage & insert record into PostgreSQL database
+        evidence_url = None
+        if self.supabase.enabled and os.path.exists(snapshot_path):
+            remote_filename = f"student_{student_id}_{cat_slug}.jpg"
+            evidence_url = self.supabase.upload_evidence_image(
+                local_filepath=snapshot_path,
+                remote_path=f"incidents/{remote_filename}"
+            )
+            self.supabase.insert_violation(
+                student_id=student_id,
+                score=score,
+                cheat_reason=cheat_reason,
+                category_name=category_name,
+                cat_count=cat_count,
+                evidence_url=evidence_url,
+                session_id=self.session_id,
+                metrics=metrics
+            )
+
         with open(self.csv_filepath, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -147,7 +173,8 @@ class IncidentLogger:
                 round(float(mouth), 3) if mouth is not None else "N/A",
                 round(float(lean), 1) if lean is not None else "N/A",
                 bool(hands_under),
-                snapshot_path
+                evidence_url or snapshot_path
             ])
 
         return True, snapshot_path
+

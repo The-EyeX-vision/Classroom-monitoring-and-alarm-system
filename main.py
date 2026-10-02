@@ -22,6 +22,13 @@ from src.logging import IncidentLogger
 from src.ui import draw_flag_overlay, apply_spotlight, draw_dashboard
 
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Smart Exam Hall Cheating Detection System"
@@ -51,6 +58,10 @@ def parse_args():
         help="Directory to save annotated frame snapshots when cheating is flagged."
     )
     parser.add_argument(
+        "--session-id", type=str, default=None,
+        help="Optional Exam Session UUID from exam_sessions / exam_hall_sessions database table."
+    )
+    parser.add_argument(
         "--cooldown-sec", type=float, default=5.0,
         help="Pause duration in seconds for student tracking alerts after flagging an incident."
     )
@@ -59,6 +70,7 @@ def parse_args():
         help="Run without displaying OpenCV window (headless mode)."
     )
     return parser.parse_args()
+
 
 
 def main():
@@ -84,8 +96,10 @@ def main():
     logger = IncidentLogger(
         csv_filepath=args.output_csv,
         output_dir=args.snapshot_dir,
-        cooldown_sec=args.cooldown_sec
+        cooldown_sec=args.cooldown_sec,
+        session_id=args.session_id
     )
+
 
     total_frames = 0
     start_time = time.time()

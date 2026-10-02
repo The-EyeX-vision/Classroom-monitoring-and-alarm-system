@@ -7,3 +7,8 @@ numpy>=1.24.0
 
 # Track 4 alarm playback
 playsound3>=3.0.0
+
+# Database & Storage integration
+supabase>=2.0.0
+python-dotenv>=1.0.0
+
