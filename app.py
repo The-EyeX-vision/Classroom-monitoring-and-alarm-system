@@ -85,9 +85,27 @@ else:
     else:
         video_filepath = os.path.join(PROJECT_ROOT, "test_video", "sample-three.mp4")
 
+pose_model_choice = st.sidebar.selectbox(
+    "MediaPipe Pose Model:",
+    (
+        "Heavy (High Accuracy - Default)",
+        "Full (Balanced)",
+        "Lite (High Speed / Low CPU)"
+    ),
+    index=0
+)
+
+if "Heavy" in pose_model_choice:
+    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "pose_landmarker_heavy.task")
+elif "Full" in pose_model_choice:
+    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "pose_landmarker_full.task")
+else:
+    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "pose_landmarker_lite.task")
+
 session_id = st.sidebar.text_input("Exam Session ID (Optional UUID):", value=os.getenv("EXAM_SESSION_ID", ""))
 threshold = st.sidebar.slider("Suspicion Alert Threshold:", min_value=0.30, max_value=0.90, value=0.50, step=0.05)
 cooldown_sec = st.sidebar.slider("Student Alert Cooldown (sec):", min_value=1.0, max_value=15.0, value=5.0, step=1.0)
+
 
 # Main Dashboard Layout
 kpi1, kpi2, kpi3, kpi4 = st.columns(4)
@@ -143,7 +161,7 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
     stream = VideoStream(source=video_filepath)
     pipeline = ClassroomDetectionPipeline(
         yolo_model_path=os.path.join(PROJECT_ROOT, "models", "yolov8n.pt"),
-        pose_model_path=os.path.join(PROJECT_ROOT, "models", "pose_landmarker_heavy.task"),
+        pose_model_path=selected_pose_model,
         face_model_path=os.path.join(PROJECT_ROOT, "models", "face_landmarker.task")
     )
 
