@@ -19,12 +19,12 @@ class ClassroomDetectionPipeline:
                  yolo_model_path=None,
                  pose_model_path=None,
                  face_model_path=None,
-                 confidence_threshold=0.15,
-                 crop_phone_conf=0.45,  # Higher threshold filters bags, calculators, desk items misclassified as phones
-                 crop_padding=0.05,
-                 yolo_input_width=1280,
-                 crop_size_px=256,
-                 landmark_every_n_frames=1):
+        confidence_threshold=0.10,
+        crop_phone_conf=0.45,  # Higher threshold filters bags, calculators, desk items misclassified as phones
+        crop_padding=0.12,
+        yolo_input_width=1280,
+        crop_size_px=256,
+        landmark_every_n_frames=1):
 
         self.yolo_model_path = yolo_model_path or DEFAULT_YOLO_PATH
         self.pose_model_path = pose_model_path or DEFAULT_POSE_PATH
@@ -50,9 +50,9 @@ class ClassroomDetectionPipeline:
             base_options=BaseOptions(model_asset_path=self.pose_model_path),
             running_mode=RunningMode.VIDEO,
             num_poses=1,
-            min_pose_detection_confidence=0.5,
-            min_pose_presence_confidence=0.5,
-            min_tracking_confidence=0.5,
+            min_pose_detection_confidence=0.3,
+            min_pose_presence_confidence=0.3,
+            min_tracking_confidence=0.3,
         )
         self.pose_detector = PoseLandmarker.create_from_options(pose_options)
 
@@ -61,8 +61,8 @@ class ClassroomDetectionPipeline:
             running_mode=RunningMode.VIDEO,
             num_faces=1,
             output_face_blendshapes=False,
-            min_face_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
+            min_face_detection_confidence=0.3,
+            min_tracking_confidence=0.3,
         )
         self.face_detector = FaceLandmarker.create_from_options(face_options)
 
@@ -157,9 +157,10 @@ class ClassroomDetectionPipeline:
 
     def _run_landmarks(self, crop, crop_ts):
         h, w = crop.shape[:2]
-        if w > self.crop_size_px:
-            scale = self.crop_size_px / w
-            crop = cv2.resize(crop, (self.crop_size_px, int(h * scale)), interpolation=cv2.INTER_AREA)
+        if w > 0 and w != self.crop_size_px:
+            scale = float(self.crop_size_px) / float(w)
+            interp = cv2.INTER_CUBIC if scale > 1.0 else cv2.INTER_AREA
+            crop = cv2.resize(crop, (self.crop_size_px, max(1, int(h * scale))), interpolation=interp)
 
         rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
@@ -194,17 +195,13 @@ class ClassroomDetectionPipeline:
 
         h_full, w_full = frame_bgr.shape[:2]
 
-        if w_full > self.yolo_input_width:
-            scale = self.yolo_input_width / w_full
-            yolo_input = cv2.resize(
-                frame_bgr,
-                (self.yolo_input_width, int(h_full * scale)),
-                interpolation=cv2.INTER_AREA,
-            )
-        else:
-            yolo_input = frame_bgr
+        # Always scale frame to yolo_input_width (1280px) so small/distant students are upscaled and detected
+        scale = float(self.yolo_input_width) / float(w_full)
+        target_h = int(h_full * scale)
+        interp = cv2.INTER_CUBIC if scale > 1.0 else cv2.INTER_AREA
+        yolo_input = cv2.resize(frame_bgr, (self.yolo_input_width, target_h), interpolation=interp)
 
-        results = self.yolo(yolo_input, conf=self.confidence_threshold, classes=[0, 67], imgsz=self.yolo_input_width, max_det=30, verbose=False)[0]
+        results = self.yolo(yolo_input, conf=self.confidence_threshold, classes=[0, 67], imgsz=self.yolo_input_width, max_det=50, verbose=False)[0]
         yolo_h, yolo_w = yolo_input.shape[:2]
 
         structured = {

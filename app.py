@@ -23,7 +23,7 @@ from src.db.supabase_client import SupabaseManager
 
 # Page Configuration
 st.set_page_config(
-    page_title="EyeX - Exam Hall Cheating Detection",
+    page_title="EyeX",
     page_icon="👁️",
     layout="wide"
 )
