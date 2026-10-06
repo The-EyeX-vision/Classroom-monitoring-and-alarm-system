@@ -41,7 +41,7 @@ class StudentSuspicionTracker:
     4. Communicating / Talking: Turning head + open mouth ratio (MAR > 0.12) sustained for >= 3.0 continuous seconds.
     """
 
-    def __init__(self, threshold=0.50, required_frames=2, min_turn_sec=0.0):
+    def __init__(self, threshold=0.65, required_frames=2, min_turn_sec=0.0):
         self.threshold = threshold
         self.required_frames = required_frames
         self.min_turn_sec = min_turn_sec

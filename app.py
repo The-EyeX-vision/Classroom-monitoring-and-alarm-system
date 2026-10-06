@@ -103,7 +103,8 @@ else:
     selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8s-pose.pt")
 
 session_id = st.sidebar.text_input("Exam Session ID (Optional UUID):", value=os.getenv("EXAM_SESSION_ID", ""))
-threshold = st.sidebar.slider("Suspicion Alert Threshold:", min_value=0.30, max_value=0.90, value=0.50, step=0.05)
+threshold = st.sidebar.slider("Suspicion Alert Threshold:", min_value=0.30, max_value=0.90, value=0.65, step=0.05,
+                              help="Students are only flagged when their suspicion score exceeds this value. Default: 65%.")
 cooldown_sec = st.sidebar.slider("Student Alert Cooldown (sec):", min_value=1.0, max_value=15.0, value=5.0, step=1.0)
 
 
