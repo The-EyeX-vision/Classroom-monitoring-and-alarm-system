@@ -102,7 +102,12 @@ elif "yolov8n" in yolo_pose_choice:
 else:
     selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8s-pose.pt")
 
-session_id = st.sidebar.text_input("Exam Session ID (Optional UUID):", value=os.getenv("EXAM_SESSION_ID", ""))
+TEST_SESSION_ID = "5f5a439d-da5e-4401-b9aa-0bec0f3604dc"
+session_id = st.sidebar.text_input(
+    "Monitoring Session ID:",
+    value=os.getenv("EXAM_SESSION_ID", TEST_SESSION_ID),
+    help="UUID of the active monitoring_sessions row in Supabase. Used to link all violations/alerts to this session."
+)
 threshold = st.sidebar.slider("Suspicion Alert Threshold:", min_value=0.30, max_value=0.90, value=0.65, step=0.05,
                               help="Students are only flagged when their suspicion score exceeds this value. Default: 65%.")
 cooldown_sec = st.sidebar.slider("Student Alert Cooldown (sec):", min_value=1.0, max_value=15.0, value=5.0, step=1.0)
@@ -293,9 +298,13 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
 
             draw_dashboard(frame, current_fps, len(assignments), has_incident_this_frame)
 
-            # Convert BGR to RGB for Streamlit display
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+            # Convert BGR to RGB for Streamlit display — ensure uint8 dtype
+            try:
+                display_frame = frame.astype('uint8') if frame.dtype != 'uint8' else frame
+                frame_rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+                video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+            except Exception as disp_err:
+                pass  # skip frame on transient display error
 
             # Render incident log table
             if os.path.exists(csv_log_path):

@@ -1,9 +1,11 @@
 import os
 import sys
 import logging
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger("SupabaseManager")
+logging.basicConfig(level=logging.INFO)
 
 try:
     from supabase import create_client, Client
@@ -13,10 +15,48 @@ except ImportError:
     Client = None
 
 
+# ── Enum value maps (must match Supabase enum definitions exactly) ──────────
+
+_ACTIVITY_MAP = {
+    "turning head to neighbor":           "head_turn",
+    "communicating / talking to peer":    "talking",
+    "using phone / material below desk":  "phone_use",
+    "mobile phone / unauthorized material": "phone_use",
+    "looking down under desk":            "suspicious_movement",
+    "severe lean away from desk":         "suspicious_movement",
+    "leaning & reaching away from desk":  "suspicious_movement",
+    "leaning sideways to peer":           "head_turn",
+    "general suspicion":                  "suspicious_movement",
+}
+
+def _map_activity(category_name: str) -> str:
+    """Maps free-form category names to violation_activity_type enum values."""
+    key = category_name.lower().strip()
+    for phrase, enum_val in _ACTIVITY_MAP.items():
+        if phrase in key:
+            return enum_val
+    return "suspicious_movement"   # safe fallback enum value
+
+
+def _map_severity(score: float) -> str:
+    """Maps suspicion score to violation_severity enum value."""
+    if score >= 0.85:
+        return "high"
+    elif score >= 0.65:
+        return "medium"
+    else:
+        return "low"
+
+
 class SupabaseManager:
     """
     Manages Supabase Database connection and Storage uploads for Classroom Monitoring.
+    Inserts data into:
+      - violations          (primary incident record)
+      - classroom_alerts    (session-level alert log)
+      - session_students    (upsert tracker registration)
     """
+
     def __init__(
         self,
         url: Optional[str] = None,
@@ -25,36 +65,36 @@ class SupabaseManager:
     ):
         self.url = url or os.getenv("SUPABASE_URL")
         self.key = key or os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        self.bucket_name = bucket_name or os.getenv("SUPABASE_BUCKET", "evidence")
+        self.bucket_name = bucket_name or os.getenv("SUPABASE_BUCKET", "violation-evidence")
         self.client: Optional[Client] = None
         self.enabled = False
 
         if not HAS_SUPABASE:
-            print("[SUPABASE] Notice: 'supabase' package is not installed. Database and bucket upload disabled. (Run: pip install supabase)")
+            print("[SUPABASE] 'supabase' package not installed. Run: pip install supabase")
             return
 
-        if not self.url or not self.key or "your-supabase" in self.url:
-            print("[SUPABASE] Notice: SUPABASE_URL or SUPABASE_KEY not set. Operating in offline/local CSV logging mode.")
+        if not self.url or not self.key or "your-supabase" in (self.url or ""):
+            print("[SUPABASE] SUPABASE_URL or SUPABASE_KEY not set — running in offline CSV mode.")
             return
 
         try:
             self.client = create_client(self.url, self.key)
             self.enabled = True
-            print(f"[SUPABASE] Successfully initialized Supabase client linked to bucket '{self.bucket_name}'.")
+            print(f"[SUPABASE] ✅ Connected — bucket: '{self.bucket_name}'")
         except Exception as e:
-            print(f"[SUPABASE ERROR] Failed to initialize Supabase client: {e}")
+            print(f"[SUPABASE ERROR] Failed to connect: {e}")
             self.enabled = False
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # Storage
+    # ──────────────────────────────────────────────────────────────────────────
+
     def upload_evidence_image(self, local_filepath: str, remote_path: Optional[str] = None) -> Optional[str]:
-        """
-        Uploads a local frame snapshot to the Supabase Storage bucket.
-        Returns the public URL of the uploaded image if successful.
-        """
+        """Uploads a snapshot to Supabase Storage. Returns public URL or None."""
         if not self.enabled or not self.client:
             return None
-
         if not os.path.exists(local_filepath):
-            print(f"[SUPABASE WARN] File does not exist for upload: {local_filepath}")
+            print(f"[SUPABASE WARN] Snapshot not found: {local_filepath}")
             return None
 
         filename = os.path.basename(local_filepath)
@@ -64,21 +104,44 @@ class SupabaseManager:
             with open(local_filepath, "rb") as f:
                 file_data = f.read()
 
-            # Upload or overwrite (upsert=true)
-            res = self.client.storage.from_(self.bucket_name).upload(
+            self.client.storage.from_(self.bucket_name).upload(
                 path=dest_path,
                 file=file_data,
                 file_options={"content-type": "image/jpeg", "upsert": "true"}
             )
-
-            # Get public URL
             public_url = self.client.storage.from_(self.bucket_name).get_public_url(dest_path)
-            print(f"[SUPABASE STORAGE] Snapshot uploaded to storage bucket '{self.bucket_name}': {public_url}")
+            print(f"[SUPABASE STORAGE] ✅ Uploaded: {public_url}")
             return public_url
 
         except Exception as e:
-            print(f"[SUPABASE STORAGE ERROR] Failed uploading snapshot '{filename}': {e}")
+            print(f"[SUPABASE STORAGE ERROR] ❌ Upload failed for '{filename}': {e}")
             return None
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Session Student Registration
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def upsert_session_student(self, session_id: str, student_id: Any) -> None:
+        """
+        Registers (or updates last_seen_at for) a tracked student in session_students.
+        session_id links to monitoring_sessions.id
+        """
+        if not self.enabled or not self.client or not session_id:
+            return
+        try:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            self.client.table("session_students").upsert({
+                "session_id": session_id,
+                "tracker_label": f"Student_{student_id}",
+                "last_seen_at": now_iso,
+            }, on_conflict="session_id,tracker_label").execute()
+            print(f"[SUPABASE DB] ✅ session_students upserted — Student #{student_id}")
+        except Exception as e:
+            print(f"[SUPABASE DB] ❌ session_students upsert failed: {e}")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Violation Insertion
+    # ──────────────────────────────────────────────────────────────────────────
 
     def insert_violation(
         self,
@@ -92,60 +155,70 @@ class SupabaseManager:
         metrics: Optional[Dict[str, Any]] = None
     ) -> bool:
         """
-        Inserts violation record into Supabase PostgreSQL tables ('violations', 'student_violations', or 'classroom_alerts').
+        Inserts violation into:
+          1. violations         — primary incident table
+          2. classroom_alerts   — session-level alert log
+        Returns True if at least one insert succeeded.
         """
         if not self.enabled or not self.client:
             return False
 
         metrics = metrics or {}
         session_id = session_id or os.getenv("EXAM_SESSION_ID")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        activity_enum = _map_activity(category_name)
+        severity_enum = _map_severity(score)
 
-        # Prepare record for 'violations' table (matches schema diagram)
+        inserted = False
+
+        # ── 1. violations table ───────────────────────────────────────────────
         violation_payload = {
-            "tracker_id": int(student_id) if str(student_id).isdigit() else None,
             "tracker_label": f"Student_{student_id}",
-            "activity": category_name[:50],
-            "severity": "high" if score >= 0.75 else "medium",
+            "activity": activity_enum,
+            "severity": severity_enum,
             "status": "flagged",
             "confidence": round(float(score), 4),
             "evidence_url": evidence_url,
             "metadata": {
-                "cheat_reason": cheat_reason,
-                "activity_count": cat_count,
-                "head_pitch_deg": metrics.get("head_pitch_deg"),
-                "head_yaw_deg": metrics.get("head_yaw_deg"),
+                "category_name":    category_name,
+                "cheat_reason":     cheat_reason,
+                "activity_count":   cat_count,
+                "head_pitch_deg":   metrics.get("head_pitch_deg"),
+                "head_yaw_deg":     metrics.get("head_yaw_deg"),
                 "mouth_open_ratio": metrics.get("mouth_open_ratio"),
-                "torso_lean_deg": metrics.get("torso_lean_deg"),
-                "hands_under_desk": metrics.get("hands_under_desk", False)
-            }
+                "torso_lean_deg":   metrics.get("torso_lean_deg"),
+                "hands_under_desk": metrics.get("hands_under_desk", False),
+            },
+            "created_at": now_iso,
         }
         if session_id:
             violation_payload["session_id"] = session_id
 
-        inserted = False
-
-        # Attempt 1: Insert into 'violations' table
         try:
             res = self.client.table("violations").insert(violation_payload).execute()
-            print(f"[SUPABASE DB] Inserted violation record into 'violations' table for Student #{student_id}")
+            print(f"[SUPABASE DB] ✅ violations — Student #{student_id} | {activity_enum} | {severity_enum} | {round(score*100)}%")
             inserted = True
-        except Exception as e1:
-            logger.debug(f"Insert to 'violations' failed: {e1}")
+        except Exception as e:
+            print(f"[SUPABASE DB] ❌ violations insert FAILED: {e}")
+            print(f"              Payload was: {violation_payload}")
 
-        # Attempt 2: Fallback/Secondary insert into 'classroom_alerts' table
+        # ── 2. classroom_alerts table ─────────────────────────────────────────
+        alert_payload = {
+            "student_id_tracker": str(student_id),
+            "timestamp_ms": int(datetime.now(timezone.utc).timestamp() * 1000),
+            "suspicion_score": round(float(score), 4),
+            "status": severity_enum,
+            "created_at": now_iso,
+        }
+        if session_id:
+            alert_payload["session_id"] = session_id
+
         try:
-            alert_payload = {
-                "student_id_tracker": str(student_id),
-                "suspicion_score": round(float(score), 4),
-                "status": cheat_reason[:50],
-            }
-            if session_id:
-                alert_payload["session_id"] = session_id
-
             self.client.table("classroom_alerts").insert(alert_payload).execute()
-            print(f"[SUPABASE DB] Inserted alert record into 'classroom_alerts' table for Student #{student_id}")
+            print(f"[SUPABASE DB] ✅ classroom_alerts — Student #{student_id}")
             inserted = True
-        except Exception as e2:
-            logger.debug(f"Insert to 'classroom_alerts' failed: {e2}")
+        except Exception as e:
+            print(f"[SUPABASE DB] ❌ classroom_alerts insert FAILED: {e}")
+            print(f"              Payload was: {alert_payload}")
 
         return inserted
