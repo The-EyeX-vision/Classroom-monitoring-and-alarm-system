@@ -49,6 +49,20 @@ def _map_severity(score: float) -> str:
         return "LOW"
 
 
+def _get_secret(key_name: str, default: Optional[str] = None) -> Optional[str]:
+    """Reads secret from os.environ or st.secrets (Streamlit Cloud)."""
+    val = os.getenv(key_name)
+    if val:
+        return val
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and key_name in st.secrets:
+            return st.secrets[key_name]
+    except Exception:
+        pass
+    return default
+
+
 class SupabaseManager:
     """
     Manages Supabase Database connection and Storage uploads for Classroom Monitoring.
@@ -63,10 +77,10 @@ class SupabaseManager:
         key: Optional[str] = None,
         bucket_name: Optional[str] = None
     ):
-        self.url = url or os.getenv("SUPABASE_URL")
+        self.url = url or _get_secret("SUPABASE_URL")
         # Support SUPABASE_SERVICE_ROLE_KEY (bypasses Storage/DB RLS) or standard SUPABASE_KEY
-        self.key = key or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-        self.bucket_name = bucket_name or os.getenv("SUPABASE_BUCKET", "violation-evidence")
+        self.key = key or _get_secret("SUPABASE_SERVICE_ROLE_KEY") or _get_secret("SUPABASE_KEY")
+        self.bucket_name = bucket_name or _get_secret("SUPABASE_BUCKET", "violation-evidence")
         self.client: Optional[Client] = None
         self.enabled = False
 
