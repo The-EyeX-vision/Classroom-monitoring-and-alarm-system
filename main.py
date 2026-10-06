@@ -38,16 +38,8 @@ def parse_args():
         help="Input video source: file path, camera index (e.g. 0), or IP URL."
     )
     parser.add_argument(
-        "--yolo-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "yolov8s.pt"),
-        help="Path to YOLOv8 model file."
-    )
-    parser.add_argument(
-        "--pose-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "pose_landmarker_heavy.task"),
-        help="Path to MediaPipe Pose Landmarker task file."
-    )
-    parser.add_argument(
-        "--face-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "face_landmarker.task"),
-        help="Path to MediaPipe Face Landmarker task file."
+        "--pose-model", type=str, default=os.path.join(PROJECT_ROOT, "models", "yolov8s-pose.pt"),
+        help="Path to YOLOv8-Pose model (.pt). Supports yolov8n/s/m-pose.pt variants."
     )
     parser.add_argument(
         "--output-csv", type=str, default="classroom_alerts.csv",
@@ -86,9 +78,7 @@ def main():
     stream = VideoStream(source=video_source)
 
     pipeline = ClassroomDetectionPipeline(
-        yolo_model_path=args.yolo_model,
-        pose_model_path=args.pose_model,
-        face_model_path=args.face_model
+        pose_model_path=args.pose_model
     )
 
     centroid_tracker = CentroidTracker(max_distance=0.25, max_missed_frames=600)

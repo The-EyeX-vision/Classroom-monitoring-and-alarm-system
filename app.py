@@ -85,22 +85,22 @@ else:
     else:
         video_filepath = os.path.join(PROJECT_ROOT, "test_video", "sample-three.mp4")
 
-pose_model_choice = st.sidebar.selectbox(
-    "MediaPipe Pose Model:",
+yolo_pose_choice = st.sidebar.selectbox(
+    "YOLOv8-Pose Model:",
     (
-        "Heavy (High Accuracy - Default)",
-        "Full (Balanced)",
-        "Lite (High Speed / Low CPU)"
+        "yolov8s-pose  (Balanced - Default)",
+        "yolov8m-pose  (High Accuracy)",
+        "yolov8n-pose  (Fast / Low CPU)",
     ),
     index=0
 )
 
-if "Heavy" in pose_model_choice:
-    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "pose_landmarker_heavy.task")
-elif "Full" in pose_model_choice:
-    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "pose_landmarker_full.task")
+if "yolov8m" in yolo_pose_choice:
+    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8m-pose.pt")
+elif "yolov8n" in yolo_pose_choice:
+    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8n-pose.pt")
 else:
-    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "pose_landmarker_lite.task")
+    selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8s-pose.pt")
 
 session_id = st.sidebar.text_input("Exam Session ID (Optional UUID):", value=os.getenv("EXAM_SESSION_ID", ""))
 threshold = st.sidebar.slider("Suspicion Alert Threshold:", min_value=0.30, max_value=0.90, value=0.50, step=0.05)
@@ -157,12 +157,10 @@ if stop_btn:
 if st.session_state.monitoring and video_filepath and os.path.exists(video_filepath):
     status_metric.metric(label="System Status", value="Active 🟢")
 
-    # Initialize Stream & Pipeline
+    # Initialize Stream & Pipeline (single YOLOv8-Pose model)
     stream = VideoStream(source=video_filepath)
     pipeline = ClassroomDetectionPipeline(
-        yolo_model_path=os.path.join(PROJECT_ROOT, "models", "yolov8s.pt"),
-        pose_model_path=selected_pose_model,
-        face_model_path=os.path.join(PROJECT_ROOT, "models", "face_landmarker.task")
+        pose_model_path=selected_pose_model
     )
 
     centroid_tracker = CentroidTracker(max_distance=0.25, max_missed_frames=600)
