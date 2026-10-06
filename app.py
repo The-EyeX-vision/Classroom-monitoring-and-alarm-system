@@ -102,11 +102,11 @@ elif "yolov8n" in yolo_pose_choice:
 else:
     selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8s-pose.pt")
 
-TEST_SESSION_ID = "c04dea8a-b4ff-4745-b5e2-b7e8186831dd"
+TEST_SESSION_ID = "cf385e5e-6bf7-4490-8c88-29690fb2e310"
 session_id = st.sidebar.text_input(
     "Monitoring Session ID:",
     value=os.getenv("EXAM_SESSION_ID", TEST_SESSION_ID),
-    help="UUID of active session in Supabase exam_hall_sessions table. Used to link all violations."
+    help="UUID of active session in Supabase exam_hall_sessions table (HALL 4 -> English Session)."
 )
 threshold = st.sidebar.slider("Suspicion Alert Threshold:", min_value=0.30, max_value=0.90, value=0.65, step=0.05,
                               help="Students are only flagged when their suspicion score exceeds this value. Default: 65%.")
