@@ -186,9 +186,31 @@ class SupabaseManager:
         }
 
         try:
-            res = self.client.table("violations").insert(violation_payload).execute()
-            print(f"[SUPABASE DB] ✅ Violation inserted into 'violations' table for Student #{student_id} (ID: {res.data[0]['id']})")
-            return True
+            # Check if an existing violation for this student and activity_type already exists in this session
+            existing = self.client.table("violations").select("id, confidence, evidence_url, metadata") \
+                .eq("session_id", session_id) \
+                .eq("tracker_id", tracker_num) \
+                .eq("activity_type", activity_enum) \
+                .execute()
+
+            if existing.data:
+                # UPDATE existing violation record (only count, metrics, confidence, and snapshot URL update)
+                row_id = existing.data[0]["id"]
+                prev_evidence = existing.data[0].get("evidence_url")
+                update_payload = {
+                    "severity": severity_enum,
+                    "confidence": max(round(float(score), 4), float(existing.data[0].get("confidence") or 0)),
+                    "evidence_url": evidence_url or prev_evidence,
+                    "metadata": violation_payload["metadata"]
+                }
+                res = self.client.table("violations").update(update_payload).eq("id", row_id).execute()
+                print(f"[SUPABASE DB] 🔄 Violation updated for Student #{student_id} | {activity_enum} | Count: {cat_count}")
+                return True
+            else:
+                # INSERT new violation record
+                res = self.client.table("violations").insert(violation_payload).execute()
+                print(f"[SUPABASE DB] ✅ Violation inserted into 'violations' table for Student #{student_id} (ID: {res.data[0]['id']})")
+                return True
         except Exception as e:
-            print(f"[SUPABASE DB] ❌ Violations insert FAILED: {e}")
+            print(f"[SUPABASE DB] ❌ Violations upsert/insert FAILED: {e}")
             return False

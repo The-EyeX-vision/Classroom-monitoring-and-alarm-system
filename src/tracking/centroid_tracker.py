@@ -17,7 +17,7 @@ class CentroidTracker:
 
     def __init__(self, max_distance=0.30, max_missed_frames=1000, min_confirmation_frames=1,
                  mobility_window=30, mobility_threshold=0.20, max_anchor_distance=0.35):
-        self.next_id = 0
+        self.next_id = 1
         self.tracked = {}          # id -> (x, y) centroid, normalized
         self.missed_frames = {}    # id -> consecutive frames not matched
         self.max_distance = max_distance
