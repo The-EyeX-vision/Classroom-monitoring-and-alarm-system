@@ -102,7 +102,7 @@ elif "yolov8n" in yolo_pose_choice:
 else:
     selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8s-pose.pt")
 
-TEST_SESSION_ID = "cf385e5e-6bf7-4490-8c88-29690fb2e310"
+TEST_SESSION_ID = "11a33540-0afb-4e05-9168-4ea64389384b"
 session_id = st.sidebar.text_input(
     "Monitoring Session ID:",
     value=os.getenv("EXAM_SESSION_ID", TEST_SESSION_ID),
