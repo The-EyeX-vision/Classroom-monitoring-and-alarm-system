@@ -55,13 +55,14 @@ class StudentSuspicionTracker:
         reasons = []
 
         # Vector 1: Turning Head / Communicating
-        # Account for elevated cameras: yaw angles may appear slightly smaller in 2D
         is_turning = False
         if head_yaw_deg is not None:
             abs_yaw = abs(head_yaw_deg)
-            is_intense_turn = abs_yaw > 20.0
-            is_moderate_turn = abs_yaw > 14.0
-            is_turning = is_moderate_turn or is_intense_turn
+            is_intense_turn = abs_yaw > 28.0
+            is_moderate_turn = abs_yaw > 20.0
+            
+            # Only count as 'turning' for combined heuristics (like Leaning + Turning) if it's a blatant turn
+            is_turning = is_intense_turn 
             
             if is_intense_turn:
                 score += 0.75  # Instantly exceeds 0.65 threshold
