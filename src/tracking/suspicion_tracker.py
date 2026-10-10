@@ -54,14 +54,28 @@ class StudentSuspicionTracker:
         score = 0.0
         reasons = []
 
-        # Vector 1: Turning Head / Communicating (Immediate - No Timing Delay)
-        is_turning = (head_yaw_deg is not None and abs(head_yaw_deg) > 18.0)
-        if is_turning:
-            score += 0.55
-            if mouth_open_ratio is not None and mouth_open_ratio > 0.12:
-                reasons.append("Communicating / Talking to Peer")
-            else:
-                reasons.append("Turning Head to Neighbor")
+        # Vector 1: Turning Head / Communicating
+        # Account for elevated cameras: yaw angles may appear slightly smaller in 2D
+        is_turning = False
+        if head_yaw_deg is not None:
+            abs_yaw = abs(head_yaw_deg)
+            is_intense_turn = abs_yaw > 20.0
+            is_moderate_turn = abs_yaw > 14.0
+            is_turning = is_moderate_turn or is_intense_turn
+            
+            if is_intense_turn:
+                score += 0.75  # Instantly exceeds 0.65 threshold
+                if mouth_open_ratio is not None and mouth_open_ratio > 0.12:
+                    reasons.append("Communicating / Talking to Peer")
+                else:
+                    reasons.append("Intense Head Turn to Neighbor")
+            elif is_moderate_turn:
+                score += 0.55  # Below threshold, acts as a warning or builds up with other factors
+                if mouth_open_ratio is not None and mouth_open_ratio > 0.12:
+                    score += 0.20 # Bump over threshold if talking
+                    reasons.append("Communicating / Talking to Peer")
+                else:
+                    reasons.append("Looking at Neighbor")
 
         # Vector 2: Using Phone / Material Below Desk
         if (hands_under_desk and head_pitch_deg is not None and head_pitch_deg > 14.0) or (hands_under_desk and object_near_hand):
