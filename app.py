@@ -319,15 +319,17 @@ if st.session_state.monitoring and video_filepath and os.path.exists(video_filep
             draw_dashboard(frame, current_fps, len(assignments), has_incident_this_frame)
 
             # Convert BGR to RGB for Streamlit display — ensure uint8 dtype
-            try:
-                display_frame = frame.astype('uint8') if frame.dtype != 'uint8' else frame
-                frame_rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
-                video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
-            except Exception as disp_err:
-                pass  # skip frame on transient display error
+            # Throttle UI frame rendering to every 3 frames to prevent WebSocket freeze on Streamlit Cloud
+            if total_frames % 3 == 0:
+                try:
+                    display_frame = frame.astype('uint8') if frame.dtype != 'uint8' else frame
+                    frame_rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+                    video_placeholder.image(frame_rgb, channels="RGB", use_column_width=True)
+                except Exception as disp_err:
+                    print(f"[DISPLAY ERROR] {disp_err}")
 
-            # Render incident log table
-            if os.path.exists(csv_log_path):
+            # Render incident log table (throttled to every 30 frames to avoid sluggish UI)
+            if total_frames % 30 == 0 and os.path.exists(csv_log_path):
                 try:
                     df_log = pd.read_csv(csv_log_path, on_bad_lines='skip')
                     display_cols = [c for c in ["timestamp", "student_id", "category_name", "suspicion_score"] if c in df_log.columns]
