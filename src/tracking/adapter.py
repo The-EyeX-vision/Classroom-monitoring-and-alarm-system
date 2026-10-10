@@ -60,14 +60,8 @@ def _hip_midpoint(keypoints):
 
 def _head_yaw_deg(keypoints):
     """
-    Estimates head yaw (left/right turn) from ear and nose landmarks.
-
-    Approach: compare nose x position relative to the midpoint between
-    left and right ears. When looking forward both ears are equidistant
-    from the nose. A sideways turn hides one ear and brings the nose
-    closer to the other ear.
-
-    Returns degrees: positive = turned right, negative = turned left.
+    Estimates absolute head yaw from ear and nose landmarks.
+    Positive = looking right, Negative = looking left.
     """
     nose = _kp(keypoints, NOSE)
     l_ear = _kp(keypoints, L_EAR)
@@ -76,19 +70,11 @@ def _head_yaw_deg(keypoints):
     if nose and l_ear and r_ear:
         ear_mid_x = (l_ear["x"] + r_ear["x"]) / 2.0
         ear_width = abs(r_ear["x"] - l_ear["x"])
-        if ear_width < 1e-4:
-            return 0.0
-        offset = (nose["x"] - ear_mid_x) / (ear_width / 2.0)
-        offset = max(-1.0, min(1.0, offset))
-        return offset * 70.0
+        if ear_width > 1e-4:
+            offset = (nose["x"] - ear_mid_x) / (ear_width / 2.0)
+            return max(-1.0, min(1.0, offset)) * 70.0
 
-    # Fallback: only one ear visible means strong turn toward visible ear
-    if nose and l_ear and not r_ear:
-        return -55.0   # right ear hidden → turned right (away from left)
-    if nose and r_ear and not l_ear:
-        return 55.0    # left ear hidden → turned left
-
-    # Fallback: eye separation ratio
+    # Fallback 2: Eyes
     l_eye = _kp(keypoints, L_EYE)
     r_eye = _kp(keypoints, R_EYE)
     if nose and l_eye and r_eye:

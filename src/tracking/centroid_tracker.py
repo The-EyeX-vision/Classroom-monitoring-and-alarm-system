@@ -16,7 +16,7 @@ class CentroidTracker:
     """
 
     def __init__(self, max_distance=0.30, max_missed_frames=1000, min_confirmation_frames=1,
-                 mobility_window=30, mobility_threshold=0.20, max_anchor_distance=0.35):
+                 mobility_window=30, mobility_threshold=0.20, max_anchor_distance=0.15):
         self.next_id = 1
         self.tracked = {}          # id -> (x, y) centroid, normalized
         self.missed_frames = {}    # id -> consecutive frames not matched
@@ -36,13 +36,15 @@ class CentroidTracker:
         self.mobility_threshold = mobility_threshold    # cumulative normalized displacement to flag as mobile
         self.centroid_history = {}                      # id -> list of (x, y)
 
-    def _promote_pending(self, pending_key):
+    def _promote_pending(self, pending_key, used_ids):
         cand_centroid = self.pending[pending_key]["centroid"]
 
         # Check if candidate centroid is near an existing registered desk anchor
         best_anchor_id = None
         best_anchor_dist = self.max_anchor_distance
         for aid, (ax, ay) in self.desk_anchors.items():
+            if aid in used_ids:
+                continue
             dist = math.sqrt((cand_centroid[0] - ax) ** 2 + (cand_centroid[1] - ay) ** 2)
             if dist < best_anchor_dist:
                 best_anchor_id = aid
@@ -151,7 +153,7 @@ class CentroidTracker:
                 self.pending[best_key]["centroid"] = (dx, dy)
                 self.pending[best_key]["count"] += 1
                 if self.pending[best_key]["count"] >= self.min_confirmation_frames:
-                    new_id = self._promote_pending(best_key)
+                    new_id = self._promote_pending(best_key, used_ids)
                     assignments[i] = new_id
                     used_ids.add(new_id)
             else:

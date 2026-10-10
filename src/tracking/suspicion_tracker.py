@@ -47,6 +47,7 @@ class StudentSuspicionTracker:
         self.min_turn_sec = min_turn_sec
         self.debounce_counters = {}       # student_id -> consecutive frames over threshold
         self.last_reason = {}             # student_id -> cheat reason string
+        self.baseline_yaws = {}           # student_id -> float (ema baseline yaw)
 
     def evaluate_behavior(self, student_id, head_pitch_deg, head_yaw_deg, mouth_open_ratio, torso_lean_deg,
                           hands_under_desk, hands_in_writing_pos, hands_moved_away, object_near_hand, current_time=None):
@@ -54,15 +55,20 @@ class StudentSuspicionTracker:
         score = 0.0
         reasons = []
 
-        # Vector 1: Turning Head / Communicating
+        # Vector 1: Turning Head / Communicating (Baseline Tracking for Angled Cameras)
         is_turning = False
         if head_yaw_deg is not None:
-            abs_yaw = abs(head_yaw_deg)
-            is_intense_turn = abs_yaw > 28.0
-            is_moderate_turn = abs_yaw > 20.0
+            # Initialize or update baseline (EMA)
+            learning_rate = 0.05
+            if student_id not in self.baseline_yaws:
+                self.baseline_yaws[student_id] = head_yaw_deg
             
-            # Only count as 'turning' for combined heuristics (like Leaning + Turning) if it's a blatant turn
-            is_turning = is_intense_turn 
+            baseline = self.baseline_yaws[student_id]
+            turn_delta = abs(head_yaw_deg - baseline)
+            
+            is_intense_turn = turn_delta > 25.0
+            is_moderate_turn = turn_delta > 15.0
+            is_turning = is_intense_turn
             
             if is_intense_turn:
                 score += 0.75  # Instantly exceeds 0.65 threshold
@@ -77,6 +83,10 @@ class StudentSuspicionTracker:
                     reasons.append("Communicating / Talking to Peer")
                 else:
                     reasons.append("Looking at Neighbor")
+            else:
+                # If they are NOT actively turning their head, slowly pull baseline to their CURRENT posture.
+                # This naturally adjusts for students who shift in their chair over hours of testing.
+                self.baseline_yaws[student_id] = (baseline * (1.0 - learning_rate)) + (head_yaw_deg * learning_rate)
 
         # Vector 2: Using Phone / Material Below Desk
         if (hands_under_desk and head_pitch_deg is not None and head_pitch_deg > 14.0) or (hands_under_desk and object_near_hand):
