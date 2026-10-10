@@ -102,12 +102,32 @@ elif "yolov8n" in yolo_pose_choice:
 else:
     selected_pose_model = os.path.join(PROJECT_ROOT, "models", "yolov8s-pose.pt")
 
-TEST_SESSION_ID = "11a33540-0afb-4e05-9168-4ea64389384b"
-session_id = st.sidebar.text_input(
-    "Monitoring Session ID:",
-    value=os.getenv("EXAM_SESSION_ID", TEST_SESSION_ID),
-    help="UUID of active session in Supabase exam_hall_sessions table (HALL 4 -> English Session)."
-)
+# Initialize SupabaseManager very early so we can fetch sessions for the UI
+sm = SupabaseManager()
+active_sessions = sm.get_active_sessions()
+
+TEST_SESSION_ID = "cf385e5e-6bf7-4490-8c88-29690fb2e310"
+
+if active_sessions:
+    # ── Database Connected: Show Session Select Box ──
+    # Create display options with the actual UUID as fallback in case we format the tuple
+    session_options = {s["display_name"]: s["id"] for s in active_sessions}
+    
+    selected_session_name = st.sidebar.selectbox(
+        "Monitoring Session:",
+        options=list(session_options.keys()),
+        help="Select the active session to stream this video under. Drawn directly from Supabase 'exam_hall_sessions'."
+    )
+    session_id = session_options[selected_session_name]
+else:
+    # ── Fallback: Database unavailable or no active sessions ──
+    st.sidebar.warning("No active sessions found (or offline mode).")
+    session_id = st.sidebar.text_input(
+        "Monitoring Session ID:",
+        value=os.getenv("EXAM_SESSION_ID", TEST_SESSION_ID),
+        help="UUID of active session. Use this offline fallback when DB is unreachable."
+    )
+
 threshold = st.sidebar.slider("Suspicion Alert Threshold:", min_value=0.30, max_value=0.90, value=0.65, step=0.05,
                               help="Students are only flagged when their suspicion score exceeds this value. Default: 65%.")
 cooldown_sec = st.sidebar.slider("Student Alert Cooldown (sec):", min_value=1.0, max_value=15.0, value=5.0, step=1.0)

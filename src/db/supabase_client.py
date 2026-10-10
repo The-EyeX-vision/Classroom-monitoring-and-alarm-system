@@ -134,6 +134,38 @@ class SupabaseManager:
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
+    # Session Management
+    # ──────────────────────────────────────────────────────────────────────────
+    
+    def get_active_sessions(self) -> list:
+        """Fetches active exam sessions from the database."""
+        if not self.enabled or not self.client:
+            return []
+        
+        try:
+            # Query for ACTIVE sessions and fetch the classroom name alongside
+            res = self.client.table("exam_hall_sessions") \
+                .select("id, classroom_id, course_name, status, classrooms(name)") \
+                .eq("status", "ACTIVE") \
+                .execute()
+            
+            # Format the output into a more readable list of dicts
+            sessions = []
+            for item in res.data:
+                classroom_name = item.get("classrooms", {}).get("name", "Unknown Classroom") if item.get("classrooms") else "Unknown Classroom"
+                sessions.append({
+                    "id": item["id"],
+                    "classroom_id": item["classroom_id"],
+                    "course_name": item["course_name"],
+                    "display_name": f"{classroom_name} - {item['course_name']}"
+                })
+            
+            return sessions
+        except Exception as e:
+            print(f"[SUPABASE DB] ❌ Failed to fetch active sessions: {e}")
+            return []
+
+    # ──────────────────────────────────────────────────────────────────────────
     # Violation Insertion
     # ──────────────────────────────────────────────────────────────────────────
 
